@@ -85,6 +85,20 @@ if ($test_text1 ne (join "",@lines))
 print "equal to the test text\n" ;
 print "\n" ;
 
+#
+# Extract the specified module as scalar
+#
+
+$theLines = $libobj1->get_module (KEY => 'test1');
+
+print "Module ",$libobj1->name,"(TEST1) is " ;
+if ($test_text1 ne $theLines)
+{
+    print "not " ;
+} ;
+print "equal to the test text\n" ;
+print "\n" ;
+
 $libobj1->close() ;
 
 #
@@ -215,6 +229,29 @@ for ($i = 1; $i <= 8; $i++)
 	}
     }
 }
+print "\n" ;
+
+#
+# Add the test data using the string interface.
+#
+
+$status = $libobj2->add_module(KEY => 'TEST3', DATA => $test_text2) ;
+
+print $libobj2->name(),"(TEST3) was ",($status ? "" : "not "),"added successfully.\n" ;
+print "\n" ;
+
+#
+# Get the module and verify it.
+#
+
+$theLines = $libobj2->get_module (KEY => 'test3');
+
+print "Module ",$libobj2->name,"(TEST3) is " ;
+if ($test_text2 ne $theLines)
+{
+    print "not " ;
+} ;
+print "equal to the test text\n" ;
 print "\n" ;
 
 $libobj2->close() ;

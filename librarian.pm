@@ -20,6 +20,10 @@
 #	    Add a factory method that can be used to get an "appropriate"
 #	    object of "every" class of library.
 #
+#   1.02    11-May-2003	Dick Munroe (munroe@csworks.com)
+#	    Allow get_module to return a concatenated string.
+#	    Allow get_header to return either an array or a hash reference.
+#
 
 package VMS::Librarian;
 
@@ -65,7 +69,7 @@ require AutoLoader;
     factory
 ) ;
 
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 my $DEBUG = 0;
 
@@ -349,7 +353,7 @@ sub get_header
 
     print "Exitting get_header.\n" if ($tdebug & 1) ;
 
-    return $self->{HEADER} ;
+    return (wantarray() ? @{$self->{HEADER}} : $self->{HEADER}) ; ;
 }
 
 #
@@ -646,7 +650,7 @@ sub get_module {
 
     print "Error [$!][$^E] from lbr_get_module;\n" if ((! @lines) && ($tdebug & 1)) ;
 
-    return @lines;
+    return (wantarray() ? @lines : (join "",@lines)) ;
 }
 
 
@@ -1127,6 +1131,7 @@ Additional error information is available in $! and $^E.
 =item get_header
 
     $theHeader = $l->get_header()
+    @theHeader = $l->get_header()
 
 Return a hash reference containing the library header.  The
 current library header is also stored in the library object and
@@ -1134,6 +1139,8 @@ may be retrieved using the header accessor.
 
 If an empty value is returned, additional error information is
 available in $! and $^E.
+
+In array context, the array version of the hash is returned.
 
 =item get_index
 
@@ -1157,6 +1164,7 @@ additional error information is found in $! and $^E.
 =item get_module
 
     @theData = $l->get_module(KEY => string)
+    $theData = $l->get_module(KEY => string)
 
 The data for the specified module is returned.  If an empty value
 is returned, additional error information is available in $! and
@@ -1166,6 +1174,10 @@ This member function is overriden for libraries containing text
 to allow addition of a newline character to make the data more
 "consistent" with Perl expectations.  The default implementation
 of get_header in VMS::Librarian does not modify the data.
+
+In array context, get_module returns an array of data records.
+In scalar context, get_module returns a string containing the
+concatenation of all the data records.
 
 =item new
 
@@ -1264,6 +1276,6 @@ something out.
 
 VMS::Librarian may be downloaded as a zip file from:
 
-    http://www.csworks.com/download/vms-librarian-1_01.zip
+    http://www.csworks.com/download/vms-librarian-1_02.zip
 
 =cut

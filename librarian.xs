@@ -12,6 +12,13 @@
 ** Munroe.
 **
 ** The XS code for VMS::Librarian
+**
+** Revision History:
+**
+**  1.01    11-May-2003	Dick Munroe (munroe@csworks.com)
+**	    Make the input buffer size for get_module as big as it can
+**	    be.  Make sure that the extended status information is
+**	    always valid.
 */
 
 #include <credef.h>
@@ -439,6 +446,8 @@ lbr_add_module (libindex, key, data, debug)
 	XSRETURN_EMPTY ;
     }
 
+    SETERRNO(EVMSERR, theStatus) ;
+
     RETVAL = 1 ;
 
   OUTPUT:
@@ -458,23 +467,14 @@ lbr_close (libindex, debug)
 
     theStatus = lbr$close (&libindex) ;
 
-    if ($VMS_STATUS_SUCCESS(theStatus))
-    {
-	if (lib$match_cond(&theStatus, &ss$_normal, &lbr$_normal))
-	{
-	    if (theDebug) printf("Library index [%d] closed ok in lbr_close XS.\n", libindex) ;
-	}
-	else
-	{
-	    _ckvmssts(theStatus);
-	}
-    }
-    else
+    if (! $VMS_STATUS_SUCCESS(theStatus))
     {
 	if (theDebug) printf("Error [%08x] in lbr_close XS.\n", theStatus) ;
 	SETERRNO(EVMSERR,theStatus);
 	XSRETURN_EMPTY;
     }
+
+    SETERRNO(EVMSERR, theStatus) ;
 
     RETVAL = 1;
 
@@ -586,6 +586,8 @@ lbr_connect_indices (libindex, key, keyIndex, keys, debug)
 	}
     }
 
+    SETERRNO(EVMSERR, theStatus) ;
+
     RETVAL = 1 ;
 
   OUTPUT:
@@ -606,18 +608,7 @@ lbr_delete_module (libindex, key, debug)
 
     theStatus = deleteModule(libindex, key, theDebug);
 
-    if ($VMS_STATUS_SUCCESS(theStatus))
-    {
-	if (lib$match_cond(&theStatus, &ss$_normal, &lbr$_normal))
-	{
-	    if (theDebug) printf ("Key of [%s] deleted in lbr_delete_module XS.\n", key);
-	}
-	else
-	{
-	    _ckvmssts(theStatus);
-	}
-    }
-    else
+    if (! $VMS_STATUS_SUCCESS(theStatus))
     {
 	if (theDebug) printf ("Error [%08x] in lbr_delete_module XS from deleteModule;\n",theStatus);
 	SETERRNO(EVMSERR,theStatus);
@@ -625,6 +616,8 @@ lbr_delete_module (libindex, key, debug)
     }
 
     if (theDebug) printf ("Leaving lbr_delete_module for key [%s]\n", key);
+
+    SETERRNO(EVMSERR, theStatus) ;
 
     RETVAL = 1 ;
 
@@ -647,18 +640,7 @@ lbr_get_header(libindex, debug)
 
     theStatus = lbr$get_header(&libindex, &theHeader) ;
 
-    if ($VMS_STATUS_SUCCESS(theStatus))
-    {
-	if (lib$match_cond(&theStatus, &ss$_normal, &lbr$_normal))
-	{
-	    if (theDebug) printf("status of [%08X] in lbr_get_header XS from lbr$get_header.\n", theStatus);
-	}
-	else
-	{
-	    _ckvmssts(theStatus);
-	}
-    }
-    else
+    if (! $VMS_STATUS_SUCCESS(theStatus))
     {
 	if (theDebug) printf ("Error [%08x] in lbr_get_header XS from lbr$get_header;  returning empty.\n",theStatus);
 	SETERRNO(EVMSERR,theStatus);
@@ -718,6 +700,8 @@ lbr_get_header(libindex, debug)
 	str$free1_dx(&theDateTime) ;
     }
 
+    SETERRNO(EVMSERR, theStatus) ;
+
     if (theDebug) printf ("Leaving lbr_get_header for libindex [%d]\n", libindex);
   OUTPUT:
     RETVAL
@@ -725,7 +709,7 @@ lbr_get_header(libindex, debug)
     #
     # When the HV is created, the reference count is 1.  When
     # the Reference to the HV is created (details are in the
-    # typemap that comes with Perl), the reference count
+    # typemap that comes with VMS::Librarian), the reference count
     # is incremented.  This gets it back to the right value.
     #
 
@@ -801,6 +785,8 @@ lbr_get_keys(libindex, key, debug)
 	freeKeys() ;
     }
 
+    SETERRNO(EVMSERR, theStatus) ;
+
     if (theDebug) printf ("Leaving lbr_get_keys for libindex [%d]\n", libindex);
 
   OUTPUT:
@@ -831,18 +817,7 @@ lbr_get_index (libindex, keyIndex, debug)
 
     theStatus = lbr$get_index(&libindex, &keyIndex, &getKeys, 0);
 
-    if ($VMS_STATUS_SUCCESS(theStatus))
-    {
-	if (lib$match_cond(&theStatus, &ss$_normal, &lbr$_normal))
-	{
-	    if (theDebug) printf ("Keys for index [%d] found in lbr_get_index XS from lbr$get_index.\n", keyIndex);
-	}
-	else
-	{
-	    _ckvmssts(theStatus);
-	}
-    }
-    else
+    if (! $VMS_STATUS_SUCCESS(theStatus))
     {
 	if (theDebug) printf ("Error [%08x] in lbr_get_index XS from lbr$get_index;\n",theStatus);
 	SETERRNO(EVMSERR,theStatus);
@@ -859,6 +834,8 @@ lbr_get_index (libindex, keyIndex, debug)
 
     freeKeys() ;
     
+    SETERRNO(EVMSERR, theStatus) ;
+
     if (theDebug) printf ("Leaving lbr_get_index for key index [%d]\n", keyIndex);
 
 void
@@ -872,8 +849,8 @@ lbr_get_module (libindex, key, debug)
     int theStatus;
     int theDebug;
 
-    char buffer[4096];
-    dsc$descriptor_s			theBuffer = {sizeof(buffer), DSC$K_DTYPE_T, DSC$K_CLASS_S, buffer};
+    char buffer[65536];
+    dsc$descriptor_s			theBuffer = {65535, DSC$K_DTYPE_T, DSC$K_CLASS_S, buffer};
     dsc$descriptor_s			theData = {0, DSC$K_DTYPE_T, DSC$K_CLASS_S, 0};
     dsc$descriptor_s			theKey = {strlen(key), DSC$K_DTYPE_T, DSC$K_CLASS_S, key};
     unsigned long			theRFA[2] ;
@@ -918,6 +895,8 @@ lbr_get_module (libindex, key, debug)
 	}
     }
     
+    SETERRNO(EVMSERR, theStatus) ;
+
     if (theDebug) printf ("Leaving lbr_get_module(%s) XS\n", key);
 
 int
@@ -957,18 +936,7 @@ lbr_new (libname, function, type, theCreoptHash, libindex, debug)
 
     theStatus = lbr$ini_control (&libindex, &function, &type);
 
-    if ($VMS_STATUS_SUCCESS(theStatus))
-    {
-	if (lib$match_cond(&theStatus, &ss$_normal, &lbr$_normal))
-	{
-	    if (theDebug) printf("status of [%d] from lbr$ini_control.\n", theStatus);
-	}
-	else
-	{
-	    _ckvmssts(theStatus);
-	}
-    }
-    else
+    if (! $VMS_STATUS_SUCCESS(theStatus))
     {
 	if (theDebug) printf ("Error [%08x] in lbr_new XS from lbr$ini_control.\n",theStatus);
 	SETERRNO(EVMSERR,theStatus);
@@ -979,23 +947,14 @@ lbr_new (libname, function, type, theCreoptHash, libindex, debug)
 
     if (theDebug) printf ("status of [%d] from lbr$open.\n", theStatus);
 
-    if ($VMS_STATUS_SUCCESS(theStatus))
-    {
-	if (lib$match_cond(&theStatus, &ss$_normal, &lbr$_normal))
-	{
-	    if (theDebug) printf ("Library [%s] opened ok in lbr_new XS.\n",libname);
-	}
-	else
-	{
-	    _ckvmssts(theStatus);
-	}
-    }
-    else
+    if (! $VMS_STATUS_SUCCESS(theStatus))
     {
 	if (theDebug) printf ("Error [%08x] in lbr_new XS from lbr$open.\n",theStatus);
 	SETERRNO(EVMSERR,theStatus);
 	XSRETURN_EMPTY ;
     }
+
+    SETERRNO(EVMSERR, theStatus) ;
 
     RETVAL = 1;
 
@@ -1019,23 +978,14 @@ lbr_set_index (libindex, keyIndex, debug)
 
     theStatus = lbr$set_index(&libindex, &keyIndex);
 
-    if ($VMS_STATUS_SUCCESS(theStatus))
-    {
-	if (lib$match_cond(&theStatus, &ss$_normal, &lbr$_normal))
-	{
-	    if (theDebug) printf ("Index set to [%d] in _get_index XS from lbr$set_index.\n", keyIndex);
-	}
-	else
-	{
-	    _ckvmssts(theStatus);
-	}
-    }
-    else
+    if (! $VMS_STATUS_SUCCESS(theStatus))
     {
 	if (theDebug) printf ("Error [%08x] in lbr_set_index XS from lbr$set_index.\n",theStatus);
 	SETERRNO(EVMSERR,theStatus);
 	XSRETURN_EMPTY ;
     }
+
+    SETERRNO(EVMSERR,theStatus);
 
     if (theDebug) printf ("Leaving lbr_set_index for key index [%d]\n", keyIndex);
 

@@ -7,7 +7,7 @@ MANIFEST
 Makefile.PL
 object/Object.pm
 object/Makefile.PL
-README.
+README
 test.pl
 share/Share.pm
 share/Makefile.PL
