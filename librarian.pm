@@ -38,6 +38,11 @@
 #	    Fix a bug in text mode write_module.
 #	    Add read_module.
 #
+#   1.07    14-May-2003 Dick Munroe (munroe@csworks.com)
+#	    use Carp so that I can figure out where usage errors are coming
+#	    from.
+#	    While I'm at it, generate and "EXTRACT" and "INSERT" functions.
+#
 
 package VMS::Librarian;
 
@@ -81,10 +86,12 @@ require AutoLoader;
     VLIB_CRE_OBJCASING
     VLIB_CRE_MACTXTCAS
 
+    extract
     factory
+    insert
 ) ;
 
-$VERSION = '1.06';
+$VERSION = '1.07';
 
 $DEBUG = 0;
 
@@ -113,6 +120,76 @@ sub AUTOLOAD {
 bootstrap VMS::Librarian $VERSION;
 
 # Preloaded methods go here.
+
+#
+# Utility functions intended to be called by themselves without an
+# object reference.
+#
+
+sub extract
+{
+    my %theParams = @_ ;
+
+    croak "FILENAME is required" unless (defined($theParams{FILENAME})) ;
+    croak "KEY is required" unless (defined($theParams{KEY})) ;
+    croak "LIBNAME is required" unless (defined($theParams{LIBNAME})) ;
+
+    my $theDebug = VMS::Librarian->_debug_($theParams{DEBUG}) ;
+    my $theStatus ;
+
+    my $theObject = factory(LIBNAME => $theParams{LIBNAME}, FUNCTION => VLIB_READ(), DEBUG => $theDebug) ;
+
+    if ($theObject)
+    {
+	my @theModule = $theObject->get_module(KEY => $theParams{KEY}, DEBUG => $theDebug) ;
+
+	if (@theModule)
+	{
+	    $theStatus = $theObject -> write_module(FILENAME => $theParams{FILENAME}, DATA => \@theModule, DEBUG => $theDebug) ;
+	}
+    }
+
+    return $theStatus ;
+}
+
+sub insert
+{
+    my %theParams = @_ ;
+
+    croak "FILENAME is required" unless (defined($theParams{FILENAME})) ;
+    croak "KEY is required" unless (defined($theParams{KEY})) ;
+    croak "LIBNAME is required" unless (defined($theParams{LIBNAME})) ;
+
+    my $theDebug = VMS::Librarian->_debug_($theParams{DEBUG}) ;
+    my $theStatus ;
+
+    my $theObject = factory(LIBNAME => $theParams{LIBNAME}, FUNCTION => VLIB_UPDATE(), DEBUG => $theDebug) ;
+
+    if ($theObject)
+    {
+	my @theModule = $theObject->read_module(FILENAME => $theParams{FILENAME}, DEBUG => $theDebug) ;
+
+	if (@theModule)
+	{
+	    my $theIndex = $theObject -> get_index_hash(DEBUG => $theDebug) ;
+
+	    if ($theIndex)
+	    {
+		if (exists($theIndex->{$theParams{KEY}}))
+		{
+		    $theStatus = $theObject -> replace_module(KEY => $theParams{KEY}, DATA => \@theModule, DEBUG => $theDebug) ;
+		}
+		else
+		{
+		    $theStatus = $theObject -> add_module(KEY => $theParams{KEY}, DATA => \@theModule, DEBUG => $theDebug) ;
+		}
+	    }
+	}
+    }
+
+    return $theStatus ;
+}
+
 
 #
 # Private member functions go here.
@@ -212,7 +289,7 @@ sub _new {
     }
     else
     {
-	die "no LIBNAME passed into _new";
+	croak "no LIBNAME passed";
     }
 
     #
@@ -245,7 +322,7 @@ sub _new {
 	}
 	else
 	{
-	    die "TYPE required for new library." ;
+	    croak "VMS::Librarian::_new TYPE required for new library." ;
 	}
     }
 
@@ -308,25 +385,23 @@ sub factory
 {
     %theParams = @_ ;
 
-    $theParams{DEBUG} = 0 unless (exists($theParams{DEBUG})) ;
-
     my $theDebug = VMS::Librarian->_debug_($theParams{DEBUG}) ;
 
-    die "Usage: VMS::Librarian::factory(LIBNAME=>filename, FUNCTION=>function)"
+    croak "Usage: VMS::Librarian::factory(LIBNAME=>filename, FUNCTION=>function)"
 	unless (exists($theParams{LIBNAME}) && exists($theParams{FUNCTION})) ;
     
-    die $theParams{LIBNAME} . " does not exist." unless (-e $theParams{LIBNAME}) ;
+    croak $theParams{LIBNAME} . " does not exist." unless (-e $theParams{LIBNAME}) ;
 
     my $theLibrary = new VMS::Librarian(LIBNAME=>$theParams{LIBNAME},
 					TYPE=>VLIB_UNKNOWN(),
 					FUNCTION=>VLIB_READ(),
 					DEBUG=>$theDebug) ;
 
-    die "Couldn't create library object" unless ($theLibrary) ;
+    croak "Couldn't create library object" unless ($theLibrary) ;
 
     my $theHeader = $theLibrary->get_header(DEBUG=>$theDebug) ;
 
-    die "Couldn't get library header" unless ($theHeader) ;
+    croak "Couldn't get library header" unless ($theHeader) ;
 
     undef $theLibrary ;
 
@@ -410,10 +485,10 @@ sub connect_indices
 	display(\%theParams, "Arguments for connect_indices ") ;
     }
 
-    die "KEY required in connect_indices" unless (exists($theParams{KEY})) ;
-    die "INDEX required in connect_indices" unless (exists($theParams{INDEX})) ;
-    die "KEYS required in connect_indices" unless (exists($theParams{KEYS})) ;
-    die "KEYS must be an array refference in connect_indices" unless (ref($theParams{KEYS}) eq "ARRAY") ;
+    croak "KEY required in connect_indices" unless (exists($theParams{KEY})) ;
+    croak "INDEX required in connect_indices" unless (exists($theParams{INDEX})) ;
+    croak "KEYS required in connect_indices" unless (exists($theParams{KEYS})) ;
+    croak "KEYS must be an array refference in connect_indices" unless (ref($theParams{KEYS}) eq "ARRAY") ;
 
     my $theStatus = lbr_connect_indices($self->{LIBINDEX},
 					$theParams{KEY},
@@ -498,7 +573,7 @@ sub creopt
 
     if (scalar(%theParams))
     {
-	die "Invalid parameter(s) in creopt" ;
+	croak "Invalid parameter(s) in creopt" ;
     }
 
     return \%theCreopt ;
@@ -524,9 +599,9 @@ sub add_module
 	display(\%theParams, "add_module called with ") ;
     }
 
-    die "KEY required in add_module" if (! exists($theParams{KEY})) ;
-    die "DATA required in add_module" if (! exists($theParams{DATA})) ;
-    die "DATA must be an array reference in add_module" if (ref($theParams{DATA}) ne "ARRAY") ;
+    croak "KEY required in add_module" if (! exists($theParams{KEY})) ;
+    croak "DATA required in add_module" if (! exists($theParams{DATA})) ;
+    croak "DATA must be an array reference in add_module" if (ref($theParams{DATA}) ne "ARRAY") ;
 
     $theStatus = lbr_add_module($self->library_index(), $theParams{KEY}, $theParams{DATA}, $theDebug) ;
 
@@ -557,7 +632,7 @@ sub delete_module
 	display(\%theParams, "delete_module called with ") ;
     }
 
-    die "KEY required in delete_module" if (! exists($theParams{KEY})) ;
+    croak "KEY required in delete_module" if (! exists($theParams{KEY})) ;
 
     if (ref($theParams{KEY}))
     {
@@ -613,6 +688,32 @@ sub get_index {
 }
 
 #
+# Get all the modules in the specified index.  If the index is omitted, the
+# current index is fetched.
+#
+
+sub get_index_hash {
+    my $theObject = shift ;
+    my $theStatus;
+
+    my @lines = $theObject->get_index(@_) ;
+
+    if (@lines)
+    {
+	my %lines ;
+
+	foreach (@lines)
+	{
+	    $lines{$_} = undef ;
+	}
+
+	return \%lines ;
+    }
+
+    return () ;
+}
+
+#
 # Get all keys for a given module in the current index.  
 #
 # The data structure returned is an array of hash references.
@@ -622,7 +723,7 @@ sub get_keys {
     my $self = shift;
     my %theParams = @_;
 
-    die "KEY required in get_keys" unless (exists($theParams{KEY})) ;
+    croak "KEY required in get_keys" unless (exists($theParams{KEY})) ;
 
     my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
@@ -667,7 +768,7 @@ sub get_module {
     }
 
     if (! exists $theParams{KEY}) {
-	die "no KEY passed into get_module";
+	croak "no KEY passed into get_module";
     }
 
     @lines = lbr_get_module ($self->{LIBINDEX},
@@ -700,7 +801,7 @@ sub read_module {
 	display (\%theParams, "read_module called with:");
     }
 
-    die "FILENAME required in read_module" unless (defined($theParams{FILENAME})) ;
+    croak "FILENAME required in read_module" unless (defined($theParams{FILENAME})) ;
 
     my @theData ;
     my $theFileHandle = vmssysopen($theParams{FILENAME}, O_RDONLY, 0, "ctx=bin") ;
@@ -752,9 +853,9 @@ sub replace_module
 	display(\%theParams, "replace_module called with ") ;
     }
 
-    die "KEY required in replace_module" if (! exists($theParams{KEY})) ;
-    die "DATA required in replace_module" if (! exists($theParams{DATA})) ;
-    die "DATA must be an array reference in replace_module" if (ref($theParams{DATA}) ne "ARRAY") ;
+    croak "KEY required in replace_module" if (! exists($theParams{KEY})) ;
+    croak "DATA required in replace_module" if (! exists($theParams{DATA})) ;
+    croak "DATA must be an array reference in replace_module" if (ref($theParams{DATA}) ne "ARRAY") ;
 
     $theStatus = lbr_delete_module($self->library_index(), $theParams{KEY}, $theDebug) ;
 
@@ -778,7 +879,7 @@ sub set_index {
     }
 
     if (! exists $theParams{INDEX}) {
-	die "no INDEX passed into set_index";
+	croak "no INDEX passed into set_index";
     }
 
     $theStatus = lbr_set_index ($self->{LIBINDEX},
@@ -815,9 +916,9 @@ sub write_module {
 	display (\%theParams, "write_module called with:");
     }
 
-    die "FILENAME required in write_module" unless (defined($theParams{FILENAME})) ;
-    die "DATA required in write_module" unless (defined($theParams{DATA})) ;
-    die "DATA must be an arrary reference in write_module" unless (ref($theParams{DATA}) eq "ARRAY") ;
+    croak "FILENAME required in write_module" unless (defined($theParams{FILENAME})) ;
+    croak "DATA required in write_module" unless (defined($theParams{DATA})) ;
+    croak "DATA must be an arrary reference in write_module" unless (ref($theParams{DATA}) eq "ARRAY") ;
 
     my $theFileHandle = vmssysopen($theParams{FILENAME}, O_TRUNC|O_CREAT|O_WRONLY, 0, "ctx=bin", "rfm=var") ;
 
@@ -1281,6 +1382,31 @@ code to terminate.
 VMS::Librarian is shipped with derived classes that provide
 specialized support for image, macro, object, and text libraries.
 
+=head2 Utility Functions
+
+=over 4
+
+=item extract
+
+    $theStatus = VMS::Librarian::extract(LIBNAME    => string,
+					 KEY	    => string,
+					 FILENAME   => string)
+
+Extract the specified module from the named library, storing the
+contents of the module in the named file.
+
+=item insert
+
+    $theStatus = VMS::Librarian::extract(LIBNAME    => string,
+					 KEY	    => string,
+					 FILENAME   => string)
+
+Place the contents of the named file in the named library as the
+specified module.  If the module exists it is replaced, otherwise
+the module is added.
+
+=back 4
+
 =head2 Class Functions
 
 =over 4
@@ -1446,6 +1572,15 @@ If the INDEX parameter is omitted, the current index is used.  If
 an empty value is returned additional error information is
 available in $! and $^E.
 
+=item get_index_hash
+
+    %theKeys = $l->get_index_hash(INDEX => integer)
+
+Return a hash reference using the modules for the specified index
+as keys.  If the INDEX parameter is omitted, the current index is
+used.  If an empty value is returned additional error information
+is available in $! and $^E.
+
 =item get_keys
 
     @theKeys = $l->get_keys(KEY => string)
@@ -1598,6 +1733,6 @@ something out.
 
 VMS::Librarian may be downloaded as a zip file from:
 
-    http://www.csworks.com/download/vms-librarian-1_06.zip
+    http://www.csworks.com/download/vms-librarian-1_07.zip
 
 =cut
