@@ -99,6 +99,21 @@ if ($test_text1 ne $theLines)
 print "equal to the test text\n" ;
 print "\n" ;
 
+#
+# Write the module and check for differences.
+#
+
+$theStatus = $libobj1->write_module(FILENAME=>'test1.txt', DATA=>\@lines) ;
+
+print "Module TEST1 ",($theStatus ? "wrote " : "did not write "),"correctly\n" ;
+print "\n" ;
+
+$theStatus = qx(diff test1.txt) ;
+
+print "Checking test1.txt for differences after write_module\n" ;
+print $theStatus ;
+print "\n" ;
+
 undef $libobj1 ;
 
 #
@@ -324,4 +339,44 @@ print "\n" ;
 print $libobj3->name()," has ",scalar(@lines)," keys in index ",$libobj3->current_index(),"\n" ;
 print "\n" ;
 
+#
+# Write the module and check for differences.
+#
+
+$theModule = 'C$WSTRINGS' ;
+
+print "Extracting ",$libobj3->name(),"($theModule)\n" ;
+print qx(libr/log/extract=$theModule/output=test3.obj sys\$library:decc\$crtl.olb) ;
+print "\n" ;
+
+$libobj3->set_index(INDEX => 1) ;
+
+@lines = $libobj3->get_module(KEY => $theModule) ;
+
+$theStatus = $libobj3->write_module(FILENAME=>'test3.obj', DATA=>\@lines) ;
+
+print 'Module C$WSTRINGS ',($theStatus ? "wrote " : "did not write "),"correctly\n" ;
+print "\n" ;
+
+$theStatus = qx(diff test3.obj) ;
+
+print "Checking test3.obj for differences after write_module\n" ;
+print $theStatus ;
+print "\n" ;
+
+@lines = $libobj3->read_module(FILENAME => 'test3.obj') ;
+
+print "File TEST3.OBJ ",(@lines ? "" : "did not "),"read correctly\n" ;
+print "\n" ;
+
+$theStatus = $libobj3->write_module(FILENAME=>'test3.obj', DATA=>\@lines) ;
+
+$theStatus = qx(diff test3.obj test3.obj;-2) ;
+
+print "Checking test3.obj for differences after read_module/write_module\n" ;
+print $theStatus ;
+print "\n" ;
+
 undef $libobj3 ;
+
+while (unlink 'test3.obj') {} ;

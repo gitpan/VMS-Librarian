@@ -34,6 +34,10 @@
 #   1.05    13-May-2003 Dick Munroe (munroe@csworks.com)
 #	    Add a write_module method to allow capturing of data to a file.
 #
+#   1.06    13-May-2003 Dick Munroe (munroe@csworks.com)
+#	    Fix a bug in text mode write_module.
+#	    Add read_module.
+#
 
 package VMS::Librarian;
 
@@ -80,7 +84,7 @@ require AutoLoader;
     factory
 ) ;
 
-$VERSION = '1.05';
+$VERSION = '1.06';
 
 $DEBUG = 0;
 
@@ -675,6 +679,57 @@ sub get_module {
     return (wantarray() ? @lines : (join "",@lines)) ;
 }
 
+#
+# Read a module from a file.
+#
+# Input is in binary mode.
+# sysread treats EOF as a 0 length record.  Therefore no binary
+# file may have a 0 length record or the code will think its
+# at eof when the file hasn't been fully processed.
+#
+
+sub read_module {
+    my $self = shift;
+    my %theParams = @_;
+    my $theStatus;
+
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
+
+    if ($theDebug & 1) {
+	print "Entering read_module";
+	display (\%theParams, "read_module called with:");
+    }
+
+    die "FILENAME required in read_module" unless (defined($theParams{FILENAME})) ;
+
+    my @theData ;
+    my $theFileHandle = vmssysopen($theParams{FILENAME}, O_RDONLY, 0, "ctx=bin") ;
+
+    if ($theFileHandle)
+    {
+	my $theBytesRead ;
+	my $theDataRead ;
+
+	while ($theBytesRead = sysread($theFileHandle, $theDataRead, 65535))
+	{
+	    push @theData, $theDataRead ;
+	}
+    }
+
+    if (! defined($theFileHandle)) 
+    {
+	if ($theDebug & 1) { print "Error [$!][$^E] in read_module; returning undef\n" }
+    }
+
+    CORE::close($theFileHandle) ;
+
+    if ($theDebug & 1) {
+	display (\%theParams, "read_module returned with:");
+	print "exiting read_module";
+    }
+
+    return @theData ;
+}
 
 #
 # Replace a module in a library.
@@ -764,7 +819,7 @@ sub write_module {
     die "DATA required in write_module" unless (defined($theParams{DATA})) ;
     die "DATA must be an arrary reference in write_module" unless (ref($theParams{DATA}) eq "ARRAY") ;
 
-    my $theFileHandle = vmssysopen($theParams{FILENAME}, O_CREAT|O_WRONLY, 0, "ctx=bin", "rfm=var") ;
+    my $theFileHandle = vmssysopen($theParams{FILENAME}, O_TRUNC|O_CREAT|O_WRONLY, 0, "ctx=bin", "rfm=var") ;
 
     if ($theFileHandle)
     {
@@ -926,6 +981,21 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     print "equal to the test text\n" ;
     print "\n" ;
 
+    #
+    # Write the module and check for differences.
+    #
+
+    $theStatus = $libobj1->write_module(FILENAME=>'test1.txt', DATA=>\@lines) ;
+
+    print "Module TEST1 ",($theStatus ? "wrote " : "did not write "),"correctly\n" ;
+    print "\n" ;
+
+    $theStatus = qx(diff test1.txt) ;
+
+    print "Checking test1.txt for differences after write_module\n" ;
+    print $theStatus ;
+    print "\n" ;
+
     undef $libobj1 ;
 
     #
@@ -938,12 +1008,12 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     print "factory ",(($libobj1 && (ref($libobj1) eq "VMS::Librarian::Text")) ? "returned" : "did not return")," a valid library object\n" ;
     print "\n" ;
 
-    $theStatus = $libobj1->delete_module(KEY => 'test1') ;
+    $status = $libobj1->delete_module(KEY => 'test1') ;
 
-    print $libobj1->name(),"(TEST1) was ",($theStatus ? "" : "not "),"deleted successfully\n" ;
+    print $libobj1->name(),"(TEST1) was ",($status ? "" : "not "),"deleted successfully\n" ;
     print "\n" ;
 
-    if ($theStatus)
+    if ($status)
     {
 	my @theIndex = $libobj1->get_index() ;
 	foreach (@theIndex)
@@ -989,9 +1059,9 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     # Add the test data.
     #
 
-    $theStatus = $libobj2->add_module(KEY => 'TEST2', DATA => \@test_text2) ;
+    $status = $libobj2->add_module(KEY => 'TEST2', DATA => \@test_text2) ;
 
-    print $libobj2->name(),"(TEST2) was ",($theStatus ? "" : "not "),"added successfully.\n" ;
+    print $libobj2->name(),"(TEST2) was ",($status ? "" : "not "),"added successfully.\n" ;
     print "\n" ;
 
     #
@@ -1015,9 +1085,9 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
 
     @keys = ('TEST2A', 'TEST2B') ;
 
-    $theStatus = $libobj2->connect_indices(KEY=>'TEST2', INDEX=>2, KEYS => \@keys) ;
+    $status = $libobj2->connect_indices(KEY=>'TEST2', INDEX=>2, KEYS => \@keys) ;
 
-    print "Additional keys were ",($theStatus ? "" : "not "),"added successfully.\n" ;
+    print "Additional keys were ",($status ? "" : "not "),"added successfully.\n" ;
     print "\n" ;
 
     #
@@ -1062,9 +1132,9 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     # Add the test data using the string interface.
     #
 
-    $theStatus = $libobj2->add_module(KEY => 'TEST3', DATA => $test_text2) ;
+    $status = $libobj2->add_module(KEY => 'TEST3', DATA => $test_text2) ;
 
-    print $libobj2->name(),"(TEST3) was ",($theStatus ? "" : "not "),"added successfully.\n" ;
+    print $libobj2->name(),"(TEST3) was ",($status ? "" : "not "),"added successfully.\n" ;
     print "\n" ;
 
     #
@@ -1151,7 +1221,47 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     print $libobj3->name()," has ",scalar(@lines)," keys in index ",$libobj3->current_index(),"\n" ;
     print "\n" ;
 
+    #
+    # Write the module and check for differences.
+    #
+
+    $theModule = 'C$WSTRINGS' ;
+
+    print "Extracting ",$libobj3->name(),"($theModule)\n" ;
+    print qx(libr/log/extract=$theModule/output=test3.obj sys\$library:decc\$crtl.olb) ;
+    print "\n" ;
+
+    $libobj3->set_index(INDEX => 1) ;
+
+    @lines = $libobj3->get_module(KEY => $theModule) ;
+
+    $theStatus = $libobj3->write_module(FILENAME=>'test3.obj', DATA=>\@lines) ;
+
+    print 'Module C$WSTRINGS ',($theStatus ? "wrote " : "did not write "),"correctly\n" ;
+    print "\n" ;
+
+    $theStatus = qx(diff test3.obj) ;
+
+    print "Checking test3.obj for differences after write_module\n" ;
+    print $theStatus ;
+    print "\n" ;
+
+    @lines = $libobj3->read_module(FILENAME => 'test3.obj') ;
+
+    print "File TEST3.OBJ ",(@lines ? "" : "did not "),"read correctly\n" ;
+    print "\n" ;
+
+    $theStatus = $libobj3->write_module(FILENAME=>'test3.obj', DATA=>\@lines) ;
+
+    $theStatus = qx(diff test3.obj test3.obj;-2) ;
+
+    print "Checking test3.obj for differences after read_module/write_module\n" ;
+    print $theStatus ;
+    print "\n" ;
+
     undef $libobj3 ;
+
+    while (unlink 'test3.obj') {} ;
 
 =head1 DESCRIPTION
 
@@ -1169,7 +1279,7 @@ Omitted required parameters cause an error message and your Perl
 code to terminate.
 
 VMS::Librarian is shipped with derived classes that provide
-specialized support for macro, object, and text libraries.
+specialized support for image, macro, object, and text libraries.
 
 =head2 Class Functions
 
@@ -1232,7 +1342,7 @@ the XS side of the interface.
 =item add_module
 
     $theStatus = $l->add_module(KEY   => name,
-			     DATA  => array reference)
+			        DATA  => array reference)
 
 Add a module to the library.  The module key is added to the
 current index.  The data to be added is contained in an array.
@@ -1264,8 +1374,8 @@ information is in $! and $^E.
 =item connect_indices
 
     $theStatus = $l->connect_indices(KEY	=> string,
-				  INDEX	=> integer,
-				  KEYS	=> array reference)
+				     INDEX	=> integer,
+				     KEYS	=> array reference)
 
 Connect the KEYS in the INDEX to the module KEY in the current
 index.  The module KEY must exist in the library prior to calling
@@ -1385,7 +1495,7 @@ available in $! anbd $^E.
 =item replace_module
 
     $theStatus = $l->replace_module(KEY   => name,
-				 DATA  => array reference)
+				    DATA  => array reference)
 
 replace_module is syntactic sugar.  It calls delete_module
 before calling add_module.  The specified module must exist.  If
@@ -1406,7 +1516,7 @@ additional information will be available in $! and $^E.
 				  DATA => array reference)
 
 Write the data to the specified file.  By default the output file
-contains binary data store in variable length records.
+contains binary data stored in variable length records.
 
 =back
 
@@ -1488,6 +1598,6 @@ something out.
 
 VMS::Librarian may be downloaded as a zip file from:
 
-    http://www.csworks.com/download/vms-librarian-1_05.zip
+    http://www.csworks.com/download/vms-librarian-1_06.zip
 
 =cut
