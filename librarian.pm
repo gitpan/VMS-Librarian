@@ -31,7 +31,7 @@
 #	    Make DEBUG a package variable.
 #	    Add perl level debugging information to close.
 #
-#   1.04    13-May-2003 Dick Munroe (munroe@csworks.com)
+#   1.05    13-May-2003 Dick Munroe (munroe@csworks.com)
 #	    Add a write_module method to allow capturing of data to a file.
 #
 
@@ -80,7 +80,7 @@ require AutoLoader;
     factory
 ) ;
 
-$VERSION = '1.04';
+$VERSION = '1.05';
 
 $DEBUG = 0;
 
@@ -617,7 +617,6 @@ sub get_index {
 sub get_keys {
     my $self = shift;
     my %theParams = @_;
-    my $theStatus;
 
     die "KEY required in get_keys" unless (exists($theParams{KEY})) ;
 
@@ -779,11 +778,11 @@ sub write_module {
     if (! defined($theStatus)) 
     {
 	if ($theDebug & 1) { print "Error [$!][$^E] in write_module; returning undef\n" }
-	close($theFileHandle) ;
+	CORE::close($theFileHandle) ;
 	return $theStatus ;
     }
 
-    close($theFileHandle) ;
+    CORE::close($theFileHandle) ;
 
     if ($theDebug & 1) {
 	display (\%theParams, "write_module returned with:");
@@ -1489,6 +1488,6 @@ something out.
 
 VMS::Librarian may be downloaded as a zip file from:
 
-    http://www.csworks.com/download/vms-librarian-1_04.zip
+    http://www.csworks.com/download/vms-librarian-1_05.zip
 
 =cut
