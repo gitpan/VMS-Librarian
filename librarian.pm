@@ -16,6 +16,10 @@
 #	    Add a new function that can be called from any derived class.
 #	    Allow the cloning of a librarian object.
 #
+#   1.01    10-May-2003	Dick Munroe (munroe@csworks.com)
+#	    Add a factory method that can be used to get an "appropriate"
+#	    object of "every" class of library.
+#
 
 package VMS::Librarian;
 
@@ -57,9 +61,11 @@ require AutoLoader;
     VLIB_CRE_HLPCASING
     VLIB_CRE_OBJCASING
     VLIB_CRE_MACTXTCAS
+
+    factory
 ) ;
 
-$VERSION = '1.00';
+$VERSION = '1.01';
 
 my $DEBUG = 0;
 
@@ -253,6 +259,73 @@ sub new
 
     return $thePackage->_new(@_) ;
 } ;
+
+#
+# The following is a "factory" that, given an EXISTING library,
+# will return an object of the appropriate type (or an error for
+# an unsupported type) to handle that library.
+#
+# This is NOT an object oriented call.
+#
+
+sub factory
+{
+    %theParams = @_ ;
+
+    $theParams{DEBUG} = 0 unless (exists($theParams{DEBUG})) ;
+
+    my $theDebug = $DEBUG || $self->{DEBUG} || $theParams{DEBUG} ;
+
+    die "Usage: VMS::Librarian::factory(LIBNAME=>filename, FUNCTION=>function)"
+	unless (exists($theParams{LIBNAME}) && exists($theParams{FUNCTION})) ;
+    
+    die $theParams{LIBNAME} . " does not exist." unless (-e $theParams{LIBNAME}) ;
+
+    my $theLibrary = new VMS::Librarian(LIBNAME=>$theParams{LIBNAME},
+					TYPE=>VLIB_UNKNOWN(),
+					FUNCTION=>VLIB_READ(),
+					DEBUG=>$theDebug) ;
+
+    die "Couldn't create library object" unless ($theLibrary) ;
+
+    my $theHeader = $theLibrary->get_header(DEBUG=>$theDebug) ;
+
+    die "Couldn't get library header" unless ($theHeader) ;
+
+    undef $theLibrary ;
+
+    if ($theHeader->{TYPE} == VLIB_ALPHA_OBJECT())  { require VMS::Librarian::Object unless (defined(&VMS::Librarian::Object::new)) ;
+						      return new VMS::Librarian::Object(LIBNAME=>$theParams{LIBNAME},
+											FUNCTION=>$theParams{FUNCTION},
+											TYPE=>VLIB_ALPHA_OBJECT(),
+											DEBUG=>$theDebug) ; }
+    if ($theHeader->{TYPE} == VLIB_VAX_OBJECT())  { require VMS::Librarian::Object unless (defined(&VMS::Librarian::Object::new)) ;
+						    return new VMS::Librarian::Object(LIBNAME=>$theParams{LIBNAME},
+										      FUNCTION=>$theParams{FUNCTION},
+										      TYPE=>VLIB_VAX_OBJECT(),
+										      DEBUG=>$theDebug) ; }
+    if ($theHeader->{TYPE} == VLIB_MACRO())  { require VMS::Librarian::Macro unless (defined(&VMS::Librarian::Macro::new)) ;
+					       return new VMS::Librarian::Macro(LIBNAME=>$theParams{LIBNAME},
+										FUNCTION=>$theParams{FUNCTION},
+										TYPE=>VLIB_MACRO(),
+										DEBUG=>$theDebug) ; }
+    if ($theHeader->{TYPE} == VLIB_TEXT())  { require VMS::Librarian::Text unless (defined(&VMS::Librarian::Text::new)) ;
+					      return new VMS::Librarian::Text(LIBNAME=>$theParams{LIBNAME},
+									      FUNCTION=>$theParams{FUNCTION},
+									      TYPE=>VLIB_TEXT(),
+									      DEBUG=>$theDebug) ; }
+    if ($theHeader->{TYPE} == VLIB_ALPHA_IMAGE())  { require VMS::Librarian::Share unless (defined(&VMS::Librarian::Share::new)) ;
+						     return new VMS::Librarian::Share(LIBNAME=>$theParams{LIBNAME},
+										      FUNCTION=>$theParams{FUNCTION},
+										      TYPE=>VLIB_ALPHA_IMAGE(),
+										      DEBUG=>$theDebug) ; }
+    if ($theHeader->{TYPE} == VLIB_VAX_IMAGE())  { require VMS::Librarian::Share unless (defined(&VMS::Librarian::Share::new)) ;
+						   return new VMS::Librarian::Share(LIBNAME=>$theParams{LIBNAME},
+										    FUNCTION=>$theParams{FUNCTION},
+										    TYPE=>VLIB_VAX_IMAGE(),
+										    DEBUG=>$theDebug) ; }
+    return () ;
+}
 
 #
 # Get the header information for the library.
@@ -909,6 +982,21 @@ code to terminate.
 VMS::Librarian is shipped with derived classes that provide
 specialized support for macro, object, and text libraries.
 
+=head2 Standalone Functions
+
+=over 4
+
+=item factory
+
+    $theObject = VMS::Librarian::factory(LIBNAME=>string,
+					 FUNCTION=integer)
+
+The factory returns an appropriately typed object for processing
+a library.  The library must already exist.  If the library is
+not of a known type, then the returned object will be undefined.
+
+=back 4
+
 =head2 Accessors
 
 Accessors provide read-only access to some of the internal state
@@ -1176,5 +1264,6 @@ something out.
 
 VMS::Librarian may be downloaded as a zip file from:
 
-    http://www.csworks.com/download/vms-librarian-1_00.zip
+    http://www.csworks.com/download/vms-librarian-1_01.zip
+
 =cut

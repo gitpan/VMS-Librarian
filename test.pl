@@ -89,14 +89,32 @@ $libobj1->close() ;
 
 #
 # Delete a module and all its keys.
+# Use the factory interface to open the library.
 #
 
-$libobj1 = new VMS::Librarian::Text (LIBNAME => 'test1.tlb', FUNCTION=>VLIB_UPDATE);
+$libobj1 = VMS::Librarian::factory(LIBNAME=>'test1.tlb', FUNCTION=>VLIB_UPDATE) ;
+
+print "factory ",(($libobj1 && (ref($libobj1) eq "VMS::Librarian::Text")) ? "returned" : "did not return")," a valid library object\n" ;
+print "\n" ;
 
 $status = $libobj1->delete_module(KEY => 'test1') ;
 
 print $libobj1->name(),"(TEST1) was ",($status ? "" : "not "),"deleted successfully\n" ;
 print "\n" ;
+
+if ($status)
+{
+    my @theIndex = $libobj1->get_index() ;
+    foreach (@theIndex)
+    {
+	if ($_ eq "TEST1")
+	{
+	    print "Error: TEST1 not deleted properly from ",$libobj1->name(),"\n" ;
+	    print "\n" ;
+	    last ;
+	}
+    }
+}
 
 $libobj1->close() ;
 
@@ -197,6 +215,7 @@ for ($i = 1; $i <= 8; $i++)
 	}
     }
 }
+print "\n" ;
 
 $libobj2->close() ;
 
@@ -212,10 +231,12 @@ my $libobj3 = new VMS::Librarian::Object(LIBNAME=>'sys$library:decc$crtl.olb',FU
 $libobj3->set_index(INDEX=>2) ;
 @lines = $libobj3->get_index(INDEX=>1) ;
 
-print "\n",$libobj3->name()," has ",scalar(@lines)," keys in index 1\n" ;
+print $libobj3->name()," has ",scalar(@lines)," keys in index 1\n" ;
+print "\n" ;
 
 @lines = $libobj3->get_index() ;
 
 print $libobj3->name()," has ",scalar(@lines)," keys in index ",$libobj3->current_index(),"\n" ;
+print "\n" ;
 
 $libobj3->close() ;
