@@ -1,0 +1,15 @@
+Changes
+Librarian.pm
+Librarian.xs
+macro/macro.pm
+macro/Makefile.PL
+MANIFEST
+Makefile.PL
+object/Object.pm
+object/Makefile.PL
+test.pl
+share/Share.pm
+share/Makefile.PL
+text/Text.pm
+text/Makefile.PL
+typemap
