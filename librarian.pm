@@ -24,6 +24,13 @@
 #	    Allow get_module to return a concatenated string.
 #	    Allow get_header to return either an array or a hash reference.
 #
+#   1.03    12-May-2003 Dick Munroe (munroe@csworks.com)
+#	    Fix some documentation problems.  Add Help library class, fix
+#	    a few small bugs in the derived classes.
+#	    Fix debug flag order.
+#	    Make DEBUG a package variable.
+#	    Add perl leve debugging information to close.
+#
 
 package VMS::Librarian;
 
@@ -69,9 +76,9 @@ require AutoLoader;
     factory
 ) ;
 
-$VERSION = '1.02';
+$VERSION = '1.03';
 
-my $DEBUG = 0;
+$DEBUG = 0;
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -98,6 +105,25 @@ sub AUTOLOAD {
 bootstrap VMS::Librarian $VERSION;
 
 # Preloaded methods go here.
+
+#
+# Private member functions go here.
+#
+
+#
+# This enforces the debugging flag order as follows:
+#
+#   1. If the debug flag was passed, then use it.
+#   2. If the SELF flag is defined, then use it.
+#   3. If the package flag is defined, then use it.
+#
+
+sub _debug_
+{
+    return $_[1] if (defined($_[1])) ;
+    return $_[0]->{DEBUG} if (defined($_[0]->{DEBUG})) ;
+    return $DEBUG ;
+}
 
 #
 # Accessors for various bits and pieces of the library object.
@@ -158,10 +184,9 @@ sub _new {
 
     my $self = bless {
 	LIBNAME       => '',
-	FUNCTION      => 1,				# default to read access
+	FUNCTION      => VLIB_READ(),			# default to read access
 	LIBINDEX      => 0,
 	CURRENTINDEX  => 1,				# Current key index (initially defaults to 1).
-	DEBUG         => 0,
     }, $theClass ;
 
     if ($theParent)
@@ -171,7 +196,6 @@ sub _new {
 
     my %theParams = @_;
     my $status;
-    my $tdebug = 0;
 
     if (exists $theParams{LIBNAME})  
     {
@@ -230,7 +254,7 @@ sub _new {
     if (exists $theParams{FUNCTION}) { $self->{FUNCTION} = $theParams{FUNCTION}; delete $theParams{FUNCTION} }
     if (exists $theParams{DEBUG})    { $self->{DEBUG}    = $theParams{DEBUG};    delete $theParams{DEBUG} }
 
-    $tdebug = $DEBUG || $self->{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     if ($tdebug & 1) {
 	print "Entering _new.\n";
@@ -278,7 +302,7 @@ sub factory
 
     $theParams{DEBUG} = 0 unless (exists($theParams{DEBUG})) ;
 
-    my $theDebug = $DEBUG || $self->{DEBUG} || $theParams{DEBUG} ;
+    my $theDebug = VMS::Librarian->_debug_($theParams{DEBUG}) ;
 
     die "Usage: VMS::Librarian::factory(LIBNAME=>filename, FUNCTION=>function)"
 	unless (exists($theParams{LIBNAME}) && exists($theParams{FUNCTION})) ;
@@ -308,6 +332,11 @@ sub factory
 										      FUNCTION=>$theParams{FUNCTION},
 										      TYPE=>VLIB_VAX_OBJECT(),
 										      DEBUG=>$theDebug) ; }
+    if ($theHeader->{TYPE} == VLIB_HELP())  { require VMS::Librarian::Help unless (defined(&VMS::Librarian::Help::new)) ;
+					      return new VMS::Librarian::Help(LIBNAME=>$theParams{LIBNAME},
+									      FUNCTION=>$theParams{FUNCTION},
+									      TYPE=>VLIB_HELP(),
+									      DEBUG=>$theDebug) ; }
     if ($theHeader->{TYPE} == VLIB_MACRO())  { require VMS::Librarian::Macro unless (defined(&VMS::Librarian::Macro::new)) ;
 					       return new VMS::Librarian::Macro(LIBNAME=>$theParams{LIBNAME},
 										FUNCTION=>$theParams{FUNCTION},
@@ -340,7 +369,7 @@ sub get_header
     my $self = shift ;
     my %theParams = @_ ;
 
-    my $tdebug = $DEBUG || $theParams{DEBUG} || $self->{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     print "Entering get_header.\n" if ($tdebug & 1) ;
 
@@ -365,7 +394,7 @@ sub connect_indices
     my $self = shift ;
     my %theParams = @_ ;
 
-    my $tdebug = $DEBUG || $theParams{DEBUG} || $self->{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     if ($tdebug & 1)
     {
@@ -406,7 +435,9 @@ sub close
     my %theParams = @_ ;
 
     my $status ;
-    my $tdebug = $DEBUG || $theParams{DEBUG} || $self->{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+
+    print "Entering close\n" if ($tdebug & 1) ;
 
     return 1 if ((!defined($self->{'LIBINDEX'})) || ($self->{'LIBINDEX'} == 0)) ;
 
@@ -419,6 +450,8 @@ sub close
     }
 
     $self->{'LIBINDEX'} = 0 ;
+
+    print "Exiting close\n" if ($tdebug & 1) ;
 
     return 1 ;
 }
@@ -435,7 +468,7 @@ sub creopt
     my %theParams = @_ ;
 
     my %theCreopt = (
-	    TYPE	=>  $self->type() || VLIB_UNKNOWN(),
+	    TYPE	=>  (defined($self->type()) ? $self->type() : VLIB_UNKNOWN()),
 	    KEYLEN	=>  31,
 	    ALLOC	=>  100,
 	    IDXMAX	=>  1,
@@ -474,11 +507,8 @@ sub add_module
     my $self = shift ;
     my %theParams = @_ ;
     my $theStatus ;
-    my $tdebug ;
 
-    $theParams{DEBUG} = 0  if ! exists $theParams{DEBUG};
-
-    $tdebug = $DEBUG || $self->{DEBUG} || $theParams{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     if ($tdebug&1)
     {
@@ -510,11 +540,8 @@ sub delete_module
     my $self = shift ;
     my %theParams = @_ ;
     my $theStatus ;
-    my $tdebug ;
 
-    $theParams{DEBUG} = 0  if ! exists $theParams{DEBUG};
-
-    $tdebug = $DEBUG || $self->{DEBUG} || $theParams{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     if ($tdebug&1)
     {
@@ -553,14 +580,12 @@ sub get_index {
     my $self = shift;
     my %theParams = @_;
     my $status;
-    my $tdebug;
 
     my @lines = ();
 
     $theParams{INDEX} = $self->{CURRENTINDEX} if ! exists $theParams{INDEX} ;
-    $theParams{DEBUG} = 0  if ! exists $theParams{DEBUG};
 
-    $tdebug = $DEBUG || $self->{DEBUG} || $theParams{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     if ($tdebug & 1) {
 	print "Entering get_index\n";
@@ -589,13 +614,10 @@ sub get_keys {
     my $self = shift;
     my %theParams = @_;
     my $status;
-    my $tdebug;
 
     die "KEY required in get_keys" unless (exists($theParams{KEY})) ;
 
-    $theParams{DEBUG} = 0 unless (exists($theParams{DEBUG})) ;
-
-    $tdebug = $DEBUG || $self->{DEBUG} || $theParams{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     if ($tdebug & 1) {
 	print "Entering get_keys\n";
@@ -627,13 +649,10 @@ sub get_module {
     my $self = shift;
     my %theParams = @_;
     my $status;
-    my $tdebug;
 
     my @lines = ();
 
-    $theParams{DEBUG} = 0  if ! exists $theParams{DEBUG};
-
-    $tdebug = $DEBUG || $self->{DEBUG} || $theParams{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     if ($tdebug & 1) {
 	print "Entering get_module\n";
@@ -666,11 +685,8 @@ sub replace_module
     my $self = shift ;
     my %theParams = @_ ;
     my $theStatus ;
-    my $tdebug ;
 
-    $theParams{DEBUG} = 0  if ! exists $theParams{DEBUG};
-
-    $tdebug = $DEBUG || $self->{DEBUG} || $theParams{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     if ($tdebug&1)
     {
@@ -695,11 +711,8 @@ sub set_index {
     my $self = shift;
     my %theParams = @_;
     my $status;
-    my $tdebug;
 
-    $theParams{DEBUG} = 0  if ! exists $theParams{DEBUG};
-
-    $tdebug = $DEBUG || $self->{DEBUG} || $theParams{DEBUG};
+    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
 
     if ($tdebug & 1) {
 	print "Entering set_index\n";
@@ -836,6 +849,7 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     {
 	print "    ",$_," = ",$theHeader->{$_},"\n" ;
     }
+    print "\n" ;
 
     #
     # Extract the specified module
@@ -849,18 +863,54 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
 	print "not " ;
     } ;
     print "equal to the test text\n" ;
+    print "\n" ;
 
-    $libobj1->close() ;
+    #
+    # Extract the specified module as scalar
+    #
+
+    $theLines = $libobj1->get_module (KEY => 'test1');
+
+    print "Module ",$libobj1->name,"(TEST1) is " ;
+    if ($test_text1 ne $theLines)
+    {
+	print "not " ;
+    } ;
+    print "equal to the test text\n" ;
+    print "\n" ;
+
+    undef $libobj1 ;
 
     #
     # Delete a module and all its keys.
+    # Use the factory interface to open the library.
     #
 
-    $libobj1 = new VMS::Librarian::Text (LIBNAME => 'test1.tlb', FUNCTION=>VLIB_UPDATE);
+    $libobj1 = VMS::Librarian::factory(LIBNAME=>'test1.tlb', FUNCTION=>VLIB_UPDATE) ;
 
-    $libobj1->delete_module(KEY => 'test1') ;
+    print "factory ",(($libobj1 && (ref($libobj1) eq "VMS::Librarian::Text")) ? "returned" : "did not return")," a valid library object\n" ;
+    print "\n" ;
 
-    $libobj1->close() ;
+    $status = $libobj1->delete_module(KEY => 'test1') ;
+
+    print $libobj1->name(),"(TEST1) was ",($status ? "" : "not "),"deleted successfully\n" ;
+    print "\n" ;
+
+    if ($status)
+    {
+	my @theIndex = $libobj1->get_index() ;
+	foreach (@theIndex)
+	{
+	    if ($_ eq "TEST1")
+	    {
+		print "Error: TEST1 not deleted properly from ",$libobj1->name(),"\n" ;
+		print "\n" ;
+		last ;
+	    }
+	}
+    }
+
+    undef $libobj1 ;
 
     while (unlink 'test1.tlb') {} ;
     while (unlink 'test1.txt') {} ;
@@ -882,11 +932,20 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
 
     $libobj2 = new VMS::Librarian::Text (LIBNAME => 'test2.tlb',FUNCTION=>VLIB_CREATE, CREOPT=>$creopt);
 
+    if ($libobj2)
+    {
+	print $libobj2->name()," created successfully\n" ;
+	print "\n" ;
+    }
+
     #
     # Add the test data.
     #
 
-    $libobj2->add_module(KEY => 'TEST2', DATA => \@test_text2) ;
+    $status = $libobj2->add_module(KEY => 'TEST2', DATA => \@test_text2) ;
+
+    print $libobj2->name(),"(TEST2) was ",($status ? "" : "not "),"added successfully.\n" ;
+    print "\n" ;
 
     #
     # Get the module and verify it.
@@ -900,6 +959,7 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
 	print "not " ;
     } ;
     print "equal to the test text\n" ;
+    print "\n" ;
 
     #
     # Add a couple of additional keys to the secondary index and link
@@ -908,7 +968,10 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
 
     @keys = ('TEST2A', 'TEST2B') ;
 
-    $libobj2->connect_indices(KEY=>'TEST2', INDEX=>2, KEYS => \@keys) ;
+    $status = $libobj2->connect_indices(KEY=>'TEST2', INDEX=>2, KEYS => \@keys) ;
+
+    print "Additional keys were ",($status ? "" : "not "),"added successfully.\n" ;
+    print "\n" ;
 
     #
     # Get and verify the module by way of the secondary entry.
@@ -924,6 +987,7 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
 	print "not " ;
     } ;
     print "equal to the test text\n" ;
+    print "\n" ;
 
     #
     # Get all keys in all indices for the TEST2B entry in the
@@ -945,10 +1009,82 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
 	    }
 	}
     }
+    print "\n" ;
 
-    $libobj2->close() ;
+    #
+    # Add the test data using the string interface.
+    #
+
+    $status = $libobj2->add_module(KEY => 'TEST3', DATA => $test_text2) ;
+
+    print $libobj2->name(),"(TEST3) was ",($status ? "" : "not "),"added successfully.\n" ;
+    print "\n" ;
+
+    #
+    # Get the module and verify it.
+    #
+
+    $theLines = $libobj2->get_module (KEY => 'test3');
+
+    print "Module ",$libobj2->name,"(TEST3) is " ;
+    if ($test_text2 ne $theLines)
+    {
+	print "not " ;
+    } ;
+    print "equal to the test text\n" ;
+    print "\n" ;
+
+    undef $libobj2 ;
 
     while (unlink 'test2.tlb') {} ;
+
+    #
+    # Check package level debug flag.
+    #
+
+    print "Check package level debug flag.\n" ;
+
+    $VMS::Librarian::DEBUG = 1 ;
+
+    $libobj3 = new VMS::Librarian::Object(LIBNAME=>'sys$library:decc$crtl.olb',FUNCTION=>VLIB_READ) ;
+
+    undef $libobj3 ;
+
+    print "\n" ;
+
+    $VMS::Librarian::DEBUG = 0 ;
+
+    #
+    # Check Object level override of debug flag.
+    #
+
+    print "Check object level override of debug flag.\n" ;
+
+    $VMS::Librarian::DEBUG = 1 ;
+
+    $libobj3 = new VMS::Librarian::Object(LIBNAME=>'sys$library:decc$crtl.olb',FUNCTION=>VLIB_READ,DEBUG=>0) ;
+
+    $libobj3->set_index(INDEX=>2) ;
+
+    undef $libobj3 ;
+
+    $VMS::Librarian::DEBUG = 0 ;
+
+    print "\n" ;
+
+    #
+    # Check member function level override of debug flag.
+    #
+
+    print "Check member function override of debug flag.\n" ;
+
+    $libobj3 = new VMS::Librarian::Object(LIBNAME=>'sys$library:decc$crtl.olb',FUNCTION=>VLIB_READ,DEBUG=>1) ;
+
+    $libobj3->set_index(INDEX=>2, DEBUG=>0) ;
+
+    undef $libobj3 ;
+
+    print "\n" ;
 
     #
     # Read the primary and secondary indices in DECC$CRTL and see
@@ -960,13 +1096,15 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     $libobj3->set_index(INDEX=>2) ;
     @lines = $libobj3->get_index(INDEX=>1) ;
 
-    print "\n",$libobj3->name()," has ",scalar(@lines)," keys in index 1\n" ;
+    print $libobj3->name()," has ",scalar(@lines)," keys in index 1\n" ;
+    print "\n" ;
 
     @lines = $libobj3->get_index() ;
 
     print $libobj3->name()," has ",scalar(@lines)," keys in index ",$libobj3->current_index(),"\n" ;
+    print "\n" ;
 
-    $libobj3->close() ;
+    undef $libobj3 ;
 
 =head1 DESCRIPTION
 
@@ -986,14 +1124,14 @@ code to terminate.
 VMS::Librarian is shipped with derived classes that provide
 specialized support for macro, object, and text libraries.
 
-=head2 Standalone Functions
+=head2 Class Functions
 
 =over 4
 
 =item factory
 
     $theObject = VMS::Librarian::factory(LIBNAME=>string,
-					 FUNCTION=integer)
+					 FUNCTION=>integer)
 
 The factory returns an appropriately typed object for processing
 a library.  The library must already exist.  If the library is
@@ -1052,7 +1190,7 @@ the XS side of the interface.
 Add a module to the library.  The module key is added to the
 current index.  The data to be added is contained in an array.
 The size of the individual elements of the array varies depending
-upon the type of the library, but the maximum length is 2048
+upon the type of the library, but the maximum length is 65535
 bytes.
 
 The key must not exist in the library.
@@ -1182,14 +1320,15 @@ concatenation of all the data records.
 =item new
 
     $l = new VMS::Librarian(LIBNAME  => string,
-			    FUNCTION => integer,
+			   [FUNCTION => integer],
 			   [TYPE     => integer,]
 			   [CREOPT   => hash reference])
 
 Create a new library object and connect it to a library.  The
 library TYPE is only required if a new library is to be created.
 In all other circumstances, VMS::Librarian can figure out the
-necessary additional library type information.  If a library is
+necessary additional library type information.  If the FUNCTION
+parameter is omitted, it defaults to read access.  If a library is
 to be created and the default creation options are not
 appropriate, a creation options hash (see creopt, above) can be
 provided for use.  If an error occurs nothing will be returned by
@@ -1252,6 +1391,24 @@ additional information will be available in $! and $^E.
 
 =back 4
 
+=head2 Derived Classes
+
+Shipped with VMS::Librarian are a number of additional classes.
+These classes provide support for the standard set of OpenVMS
+libraries.  These are:
+
+    VMS::Librarian::Help
+    VMS::Librarian::Macro
+    VMS::Librarian::Object
+    VMS::Librarian::Text
+
+When creating a new standard library, just create a new object of
+the appropriate type with the VLIB_CREATE function.
+
+These object encapsulate all the details of creating and managing
+data in these specialized libraries.  See the individual class
+module documentation (if any) for details.
+
 =head1 AUTHOR
 
 The original author of this module was Brad Hughes.  It has been
@@ -1276,6 +1433,6 @@ something out.
 
 VMS::Librarian may be downloaded as a zip file from:
 
-    http://www.csworks.com/download/vms-librarian-1_02.zip
+    http://www.csworks.com/download/vms-librarian-1_03.zip
 
 =cut

@@ -99,7 +99,7 @@ if ($test_text1 ne $theLines)
 print "equal to the test text\n" ;
 print "\n" ;
 
-$libobj1->close() ;
+undef $libobj1 ;
 
 #
 # Delete a module and all its keys.
@@ -130,7 +130,7 @@ if ($status)
     }
 }
 
-$libobj1->close() ;
+undef $libobj1 ;
 
 while (unlink 'test1.tlb') {} ;
 while (unlink 'test1.txt') {} ;
@@ -254,9 +254,57 @@ if ($test_text2 ne $theLines)
 print "equal to the test text\n" ;
 print "\n" ;
 
-$libobj2->close() ;
+undef $libobj2 ;
 
 while (unlink 'test2.tlb') {} ;
+
+#
+# Check package level debug flag.
+#
+
+print "Check package level debug flag.\n" ;
+
+$VMS::Librarian::DEBUG = 1 ;
+
+$libobj3 = new VMS::Librarian::Object(LIBNAME=>'sys$library:decc$crtl.olb',FUNCTION=>VLIB_READ) ;
+
+undef $libobj3 ;
+
+print "\n" ;
+
+$VMS::Librarian::DEBUG = 0 ;
+
+#
+# Check Object level override of debug flag.
+#
+
+print "Check object level override of debug flag.\n" ;
+
+$VMS::Librarian::DEBUG = 1 ;
+
+$libobj3 = new VMS::Librarian::Object(LIBNAME=>'sys$library:decc$crtl.olb',FUNCTION=>VLIB_READ,DEBUG=>0) ;
+
+$libobj3->set_index(INDEX=>2) ;
+
+undef $libobj3 ;
+
+$VMS::Librarian::DEBUG = 0 ;
+
+print "\n" ;
+
+#
+# Check member function level override of debug flag.
+#
+
+print "Check member function override of debug flag.\n" ;
+
+$libobj3 = new VMS::Librarian::Object(LIBNAME=>'sys$library:decc$crtl.olb',FUNCTION=>VLIB_READ,DEBUG=>1) ;
+
+$libobj3->set_index(INDEX=>2, DEBUG=>0) ;
+
+undef $libobj3 ;
+
+print "\n" ;
 
 #
 # Read the primary and secondary indices in DECC$CRTL and see
@@ -276,4 +324,4 @@ print "\n" ;
 print $libobj3->name()," has ",scalar(@lines)," keys in index ",$libobj3->current_index(),"\n" ;
 print "\n" ;
 
-$libobj3->close() ;
+undef $libobj3 ;
