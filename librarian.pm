@@ -29,12 +29,16 @@
 #	    a few small bugs in the derived classes.
 #	    Fix debug flag order.
 #	    Make DEBUG a package variable.
-#	    Add perl leve debugging information to close.
+#	    Add perl level debugging information to close.
+#
+#   1.04    13-May-2003 Dick Munroe (munroe@csworks.com)
+#	    Add a write_module method to allow capturing of data to a file.
 #
 
 package VMS::Librarian;
 
 use Carp;
+use VMS::Stdio qw(:CONSTANTS :FUNCTIONS) ;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK $AUTOLOAD);
 
 require Exporter;
@@ -76,7 +80,7 @@ require AutoLoader;
     factory
 ) ;
 
-$VERSION = '1.03';
+$VERSION = '1.04';
 
 $DEBUG = 0;
 
@@ -195,7 +199,7 @@ sub _new {
     } ;
 
     my %theParams = @_;
-    my $status;
+    my $theStatus;
 
     if (exists $theParams{LIBNAME})  
     {
@@ -254,9 +258,9 @@ sub _new {
     if (exists $theParams{FUNCTION}) { $self->{FUNCTION} = $theParams{FUNCTION}; delete $theParams{FUNCTION} }
     if (exists $theParams{DEBUG})    { $self->{DEBUG}    = $theParams{DEBUG};    delete $theParams{DEBUG} }
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    if ($tdebug & 1) {
+    if ($theDebug & 1) {
 	print "Entering _new.\n";
 	if (scalar %theParams) {
 	    display (\%theParams, "VMS::Librarian::_new called with extra params, these will be ignored");
@@ -264,19 +268,19 @@ sub _new {
 	}
     }
 
-    $status = lbr_new ($self->{LIBNAME},
+    $theStatus = lbr_new ($self->{LIBNAME},
 		       $self->{FUNCTION},
                        $self->{TYPE},
 		       $self->{CREOPT},
                        $self->{LIBINDEX},
-                       $tdebug);
+                       $theDebug);
 
-    if (! $status) {
-	if ($tdebug & 1) { print "Error [$!][$^E] from lbr_new;.\n" }
-	return $status ;
+    if (! $theStatus) {
+	if ($theDebug & 1) { print "Error [$!][$^E] from lbr_new;.\n" }
+	return $theStatus ;
     }
 
-    if ($tdebug & 1) { print "Leaving _new.\n" }
+    if ($theDebug & 1) { print "Leaving _new.\n" }
 
     return $self ;
 }
@@ -369,18 +373,18 @@ sub get_header
     my $self = shift ;
     my %theParams = @_ ;
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    print "Entering get_header.\n" if ($tdebug & 1) ;
+    print "Entering get_header.\n" if ($theDebug & 1) ;
 
     if ((defined($self->{'LIBINDEX'})) && ($self->{'LIBINDEX'} != 0))
     {
-	my $theHeader = lbr_get_header($self->{'LIBINDEX'}, $tdebug) ;
+	my $theHeader = lbr_get_header($self->{'LIBINDEX'}, $theDebug) ;
 	$self->{'HEADER'} = $theHeader ;
-	print "Error [$!][$^E] from lbr_get_header;\n" if ((! $theHeader ) && ($tdebug & 1)) ; 
+	print "Error [$!][$^E] from lbr_get_header;\n" if ((! $theHeader ) && ($theDebug & 1)) ; 
     }
 
-    print "Exitting get_header.\n" if ($tdebug & 1) ;
+    print "Exitting get_header.\n" if ($theDebug & 1) ;
 
     return (wantarray() ? @{$self->{HEADER}} : $self->{HEADER}) ; ;
 }
@@ -394,9 +398,9 @@ sub connect_indices
     my $self = shift ;
     my %theParams = @_ ;
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    if ($tdebug & 1)
+    if ($theDebug & 1)
     {
 	print "Entering connect_indices.\n" ;
 	display(\%theParams, "Arguments for connect_indices ") ;
@@ -411,16 +415,16 @@ sub connect_indices
 					$theParams{KEY},
 					$theParams{INDEX},
 					$theParams{KEYS},
-					$tdebug) ;
+					$theDebug) ;
 
 
-    print "Error [$!][$^E] from lbr_connect_indices;\n" if ((! $theStatus ) && ($tdebug & 1)) ; 
+    print "Error [$!][$^E] from lbr_connect_indices;\n" if ((! $theStatus ) && ($theDebug & 1)) ; 
 
-    $theStatus = lbr_set_index($self->{LIBINDEX}, $self->{CURRENTINDEX}, $tdebug) ;
+    $theStatus = lbr_set_index($self->{LIBINDEX}, $self->{CURRENTINDEX}, $theDebug) ;
 
-    print "Error [$!][$^E] from lbr_set_index;\n" if ((! $theStatus ) && ($tdebug & 1)) ; 
+    print "Error [$!][$^E] from lbr_set_index;\n" if ((! $theStatus ) && ($theDebug & 1)) ; 
 
-    print "Exitting connect_indices;\n" if ($tdebug & 1) ;
+    print "Exitting connect_indices;\n" if ($theDebug & 1) ;
 
     return $theStatus ;
 }
@@ -434,24 +438,24 @@ sub close
     my $self = shift ;
     my %theParams = @_ ;
 
-    my $status ;
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theStatus ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    print "Entering close\n" if ($tdebug & 1) ;
+    print "Entering close\n" if ($theDebug & 1) ;
 
     return 1 if ((!defined($self->{'LIBINDEX'})) || ($self->{'LIBINDEX'} == 0)) ;
 
-    $status = lbr_close($self->{'LIBINDEX'}, $tdebug) ;
+    $theStatus = lbr_close($self->{'LIBINDEX'}, $theDebug) ;
 
-    if (! $status) 
+    if (! $theStatus) 
     {
-	if ($tdebug & 1) { print "Error [$!][$^E] from lbr_close;\n" }
-	return $status ;
+	if ($theDebug & 1) { print "Error [$!][$^E] from lbr_close;\n" }
+	return $theStatus ;
     }
 
     $self->{'LIBINDEX'} = 0 ;
 
-    print "Exiting close\n" if ($tdebug & 1) ;
+    print "Exiting close\n" if ($theDebug & 1) ;
 
     return 1 ;
 }
@@ -508,9 +512,9 @@ sub add_module
     my %theParams = @_ ;
     my $theStatus ;
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    if ($tdebug&1)
+    if ($theDebug&1)
     {
 	print "Entering add_module\n" ;
 	display(\%theParams, "add_module called with ") ;
@@ -520,9 +524,9 @@ sub add_module
     die "DATA required in add_module" if (! exists($theParams{DATA})) ;
     die "DATA must be an array reference in add_module" if (ref($theParams{DATA}) ne "ARRAY") ;
 
-    $theStatus = lbr_add_module($self->library_index(), $theParams{KEY}, $theParams{DATA}, $tdebug) ;
+    $theStatus = lbr_add_module($self->library_index(), $theParams{KEY}, $theParams{DATA}, $theDebug) ;
 
-    print "Error [$!][$^E] from lbr_add_module;\n" if ((! $theStatus) && ($tdebug & 1)) ;
+    print "Error [$!][$^E] from lbr_add_module;\n" if ((! $theStatus) && ($theDebug & 1)) ;
 
     return $theStatus ;
 }
@@ -541,9 +545,9 @@ sub delete_module
     my %theParams = @_ ;
     my $theStatus ;
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    if ($tdebug&1)
+    if ($theDebug&1)
     {
 	print "Entering delete_module\n" ;
 	display(\%theParams, "delete_module called with ") ;
@@ -555,18 +559,18 @@ sub delete_module
     {
 	foreach (@{$theParams{KEY}})
 	{
-	    last if (! ($theStatus = lbr_delete_module($self->{LIBINDEX}, $_, $tdebug))) ;
-	    lbr_set_index($self->{LIBINDEX}, $self->{INDEX}, $tdebug) ;
+	    last if (! ($theStatus = lbr_delete_module($self->{LIBINDEX}, $_, $theDebug))) ;
+	    lbr_set_index($self->{LIBINDEX}, $self->{INDEX}, $theDebug) ;
 	}
     }
     else
     {
-	$theStatus = lbr_delete_module($self->{LIBINDEX}, $theParams{KEY}, $tdebug) ;
+	$theStatus = lbr_delete_module($self->{LIBINDEX}, $theParams{KEY}, $theDebug) ;
     }
     
-    print "Error [$!][$^E] from lbr_delete_module;\n" if ((! $theStatus) && ($tdebug & 1)) ;
+    print "Error [$!][$^E] from lbr_delete_module;\n" if ((! $theStatus) && ($theDebug & 1)) ;
 
-    lbr_set_index($self->{LIBINDEX}, $self->{CURRENTINDEX}, $tdebug) ;
+    lbr_set_index($self->{LIBINDEX}, $self->{CURRENTINDEX}, $theDebug) ;
 
     return $theStatus ;
 }
@@ -579,27 +583,27 @@ sub delete_module
 sub get_index {
     my $self = shift;
     my %theParams = @_;
-    my $status;
+    my $theStatus;
 
     my @lines = ();
 
     $theParams{INDEX} = $self->{CURRENTINDEX} if ! exists $theParams{INDEX} ;
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    if ($tdebug & 1) {
+    if ($theDebug & 1) {
 	print "Entering get_index\n";
 	display (\%theParams, "get_index called with:");
     }
 
     @lines = lbr_get_index ($self->{LIBINDEX},
                             $theParams{INDEX},
-                            $tdebug);
+                            $theDebug);
 
-    print "Error [$!][$^E] from _get_index;\n" if ((! @lines) && ($tdebug & 1)) ;
+    print "Error [$!][$^E] from _get_index;\n" if ((! @lines) && ($theDebug & 1)) ;
 
     
-    print "exiting get_index\n" if ($tdebug & 1) ;
+    print "exiting get_index\n" if ($theDebug & 1) ;
 
     return @lines ;
 }
@@ -613,30 +617,30 @@ sub get_index {
 sub get_keys {
     my $self = shift;
     my %theParams = @_;
-    my $status;
+    my $theStatus;
 
     die "KEY required in get_keys" unless (exists($theParams{KEY})) ;
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    if ($tdebug & 1) {
+    if ($theDebug & 1) {
 	print "Entering get_keys\n";
 	display (\%theParams, "get_keys called with:");
     }
 
     my $theKeys = lbr_get_keys($self->{LIBINDEX},
 			       $theParams{KEY},
-			       $tdebug);
+			       $theDebug);
 
-    print "Error [$!][$^E] from lbr_get_keys;\n" if ((! $theKeys) && ($tdebug & 1)) ;
+    print "Error [$!][$^E] from lbr_get_keys;\n" if ((! $theKeys) && ($theDebug & 1)) ;
 
     my $theStatus = lbr_set_index($self->{LIBINDEX},
 				  $self->{CURRENTINDEX},
-				  $tdebug) ;
+				  $theDebug) ;
 
-    print "Error [$!][$^E] from lbr_set_index;\n" if ((! $theStatus) && ($tdebug & 1)) ;
+    print "Error [$!][$^E] from lbr_set_index;\n" if ((! $theStatus) && ($theDebug & 1)) ;
 
-    print "exiting get_keys\n" if ($tdebug & 1) ;
+    print "exiting get_keys\n" if ($theDebug & 1) ;
 
     return (wantarray() ? @{$theKeys} : $theKeys) ;
 }
@@ -648,13 +652,13 @@ sub get_keys {
 sub get_module {
     my $self = shift;
     my %theParams = @_;
-    my $status;
+    my $theStatus;
 
     my @lines = ();
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    if ($tdebug & 1) {
+    if ($theDebug & 1) {
 	print "Entering get_module\n";
 	display (\%theParams, "get_module called with:");
     }
@@ -665,9 +669,9 @@ sub get_module {
 
     @lines = lbr_get_module ($self->{LIBINDEX},
 			     $theParams{KEY},
-			     $tdebug);
+			     $theDebug);
 
-    print "Error [$!][$^E] from lbr_get_module;\n" if ((! @lines) && ($tdebug & 1)) ;
+    print "Error [$!][$^E] from lbr_get_module;\n" if ((! @lines) && ($theDebug & 1)) ;
 
     return (wantarray() ? @lines : (join "",@lines)) ;
 }
@@ -686,9 +690,9 @@ sub replace_module
     my %theParams = @_ ;
     my $theStatus ;
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    if ($tdebug&1)
+    if ($theDebug&1)
     {
 	print "Entering replace_module\n" ;
 	display(\%theParams, "replace_module called with ") ;
@@ -698,11 +702,11 @@ sub replace_module
     die "DATA required in replace_module" if (! exists($theParams{DATA})) ;
     die "DATA must be an array reference in replace_module" if (ref($theParams{DATA}) ne "ARRAY") ;
 
-    $theStatus = lbr_delete_module($self->library_index(), $theParams{KEY}, $tdebug) ;
+    $theStatus = lbr_delete_module($self->library_index(), $theParams{KEY}, $theDebug) ;
 
-    $theStatus = lbr_add_module($self->library_index(), $theParams{KEY}, $theParams{DATA}, $tdebug) if ($theStatus) ;
+    $theStatus = lbr_add_module($self->library_index(), $theParams{KEY}, $theParams{DATA}, $theDebug) if ($theStatus) ;
 
-    print "Error [$!][$^E] in replace_module;\n" if ((! $theStatus) && ($tdebug & 1)) ;
+    print "Error [$!][$^E] in replace_module;\n" if ((! $theStatus) && ($theDebug & 1)) ;
 
     return $theStatus ;
 }
@@ -710,11 +714,11 @@ sub replace_module
 sub set_index {
     my $self = shift;
     my %theParams = @_;
-    my $status;
+    my $theStatus;
 
-    my $tdebug = $self->_debug_($theParams{DEBUG}) ;
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
 
-    if ($tdebug & 1) {
+    if ($theDebug & 1) {
 	print "Entering set_index\n";
 	display (\%theParams, "set_index called with:");
     }
@@ -723,23 +727,67 @@ sub set_index {
 	die "no INDEX passed into set_index";
     }
 
-    $status = lbr_set_index ($self->{LIBINDEX},
+    $theStatus = lbr_set_index ($self->{LIBINDEX},
                              $theParams{INDEX},
-                             $tdebug);
+                             $theDebug);
 
-    if ($status) 
+    if ($theStatus) 
     {
 	$self->{'CURRENTINDEX'} = $theParams{INDEX} ;
     }
     else
     {
-	if ($tdebug & 1) { print "Error [$!][$^E] from lbr_set_index; returning undef\n" }
-	return $status ;
+	if ($theDebug & 1) { print "Error [$!][$^E] from lbr_set_index; returning undef\n" }
+	return $theStatus ;
     }
 
-    if ($tdebug & 1) {
+    if ($theDebug & 1) {
 	display (\%theParams, "set_index returned with:");
 	print "exiting set_index\n";
+    }
+
+    return 1 ;
+}
+
+sub write_module {
+    my $self = shift;
+    my %theParams = @_;
+    my $theStatus;
+
+    my $theDebug = $self->_debug_($theParams{DEBUG}) ;
+
+    if ($theDebug & 1) {
+	print "Entering write_module";
+	display (\%theParams, "write_module called with:");
+    }
+
+    die "FILENAME required in write_module" unless (defined($theParams{FILENAME})) ;
+    die "DATA required in write_module" unless (defined($theParams{DATA})) ;
+    die "DATA must be an arrary reference in write_module" unless (ref($theParams{DATA}) eq "ARRAY") ;
+
+    my $theFileHandle = vmssysopen($theParams{FILENAME}, O_CREAT|O_WRONLY, 0, "ctx=bin", "rfm=var") ;
+
+    if ($theFileHandle)
+    {
+	foreach (@{$theParams{DATA}})
+	{
+	    $theStatus = syswrite($theFileHandle, $_, length($_)) ;
+	    last if (! defined($theStatus)) ;
+	}
+    }
+
+    if (! defined($theStatus)) 
+    {
+	if ($theDebug & 1) { print "Error [$!][$^E] in write_module; returning undef\n" }
+	close($theFileHandle) ;
+	return $theStatus ;
+    }
+
+    close($theFileHandle) ;
+
+    if ($theDebug & 1) {
+	display (\%theParams, "write_module returned with:");
+	print "exiting write_module";
     }
 
     return 1 ;
@@ -891,12 +939,12 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     print "factory ",(($libobj1 && (ref($libobj1) eq "VMS::Librarian::Text")) ? "returned" : "did not return")," a valid library object\n" ;
     print "\n" ;
 
-    $status = $libobj1->delete_module(KEY => 'test1') ;
+    $theStatus = $libobj1->delete_module(KEY => 'test1') ;
 
-    print $libobj1->name(),"(TEST1) was ",($status ? "" : "not "),"deleted successfully\n" ;
+    print $libobj1->name(),"(TEST1) was ",($theStatus ? "" : "not "),"deleted successfully\n" ;
     print "\n" ;
 
-    if ($status)
+    if ($theStatus)
     {
 	my @theIndex = $libobj1->get_index() ;
 	foreach (@theIndex)
@@ -942,9 +990,9 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     # Add the test data.
     #
 
-    $status = $libobj2->add_module(KEY => 'TEST2', DATA => \@test_text2) ;
+    $theStatus = $libobj2->add_module(KEY => 'TEST2', DATA => \@test_text2) ;
 
-    print $libobj2->name(),"(TEST2) was ",($status ? "" : "not "),"added successfully.\n" ;
+    print $libobj2->name(),"(TEST2) was ",($theStatus ? "" : "not "),"added successfully.\n" ;
     print "\n" ;
 
     #
@@ -968,9 +1016,9 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
 
     @keys = ('TEST2A', 'TEST2B') ;
 
-    $status = $libobj2->connect_indices(KEY=>'TEST2', INDEX=>2, KEYS => \@keys) ;
+    $theStatus = $libobj2->connect_indices(KEY=>'TEST2', INDEX=>2, KEYS => \@keys) ;
 
-    print "Additional keys were ",($status ? "" : "not "),"added successfully.\n" ;
+    print "Additional keys were ",($theStatus ? "" : "not "),"added successfully.\n" ;
     print "\n" ;
 
     #
@@ -1015,9 +1063,9 @@ VMS::Librarian - Perl extension for LBR$ Utility routines.
     # Add the test data using the string interface.
     #
 
-    $status = $libobj2->add_module(KEY => 'TEST3', DATA => $test_text2) ;
+    $theStatus = $libobj2->add_module(KEY => 'TEST3', DATA => $test_text2) ;
 
-    print $libobj2->name(),"(TEST3) was ",($status ? "" : "not "),"added successfully.\n" ;
+    print $libobj2->name(),"(TEST3) was ",($theStatus ? "" : "not "),"added successfully.\n" ;
     print "\n" ;
 
     #
@@ -1184,7 +1232,7 @@ the XS side of the interface.
 
 =item add_module
 
-    $status = $l->add_module(KEY   => name,
+    $theStatus = $l->add_module(KEY   => name,
 			     DATA  => array reference)
 
 Add a module to the library.  The module key is added to the
@@ -1201,7 +1249,7 @@ information is in $! and $^E.
 
 =item close
 
-    $status = $l->close()
+    $theStatus = $l->close()
 
 Close the library and disconnect the object from the library.
 Once a library has been closed, the object may no longer be used
@@ -1216,7 +1264,7 @@ information is in $! and $^E.
 
 =item connect_indices
 
-    $status = $l->connect_indices(KEY	=> string,
+    $theStatus = $l->connect_indices(KEY	=> string,
 				  INDEX	=> integer,
 				  KEYS	=> array reference)
 
@@ -1254,7 +1302,7 @@ VMS::Librarian).  See below for a list of the exported constants.
 
 =item delete_module
 
-    $status = $l->delete_module(KEY=>string or array reference)
+    $theStatus = $l->delete_module(KEY=>string or array reference)
 
 Delete one or more modules from a library.  The specified keys
 must exist in the current index.  All secondary keys are removed
@@ -1337,7 +1385,7 @@ available in $! anbd $^E.
 
 =item replace_module
 
-    $status = $l->replace_module(KEY   => name,
+    $theStatus = $l->replace_module(KEY   => name,
 				 DATA  => array reference)
 
 replace_module is syntactic sugar.  It calls delete_module
@@ -1346,12 +1394,20 @@ it doesn't, you should just call add_module.
 
 =item set_index
 
-    $status = $l->set_index(INDEX => integer)
+    $theStatus = $l->set_index(INDEX => integer)
 
 Set the current index for the library.  VMS::Librarian will
 maintain this across calls to its member functions.  If an error
 occurs when setting the index (and empty value is returned)
 additional information will be available in $! and $^E.
+
+=item write_module
+
+    $theStatus = $l->write_module(FILENAME => string,
+				  DATA => array reference)
+
+Write the data to the specified file.  By default the output file
+contains binary data store in variable length records.
 
 =back
 
@@ -1433,6 +1489,6 @@ something out.
 
 VMS::Librarian may be downloaded as a zip file from:
 
-    http://www.csworks.com/download/vms-librarian-1_03.zip
+    http://www.csworks.com/download/vms-librarian-1_04.zip
 
 =cut
